@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/hcl/hcl/printer"
 	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
+	"github.com/spiffe/spire/pkg/common/util"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/spire-api-sdk/proto/spire/api/types"
@@ -374,13 +375,10 @@ func (ds *Plugin) DeleteAttestedNode(ctx context.Context, spiffeID string) (atte
 
 // ListAttestedNodeEvents lists all attested node events
 func (ds *Plugin) ListAttestedNodeEvents(ctx context.Context, req *datastore.ListAttestedNodeEventsRequest) (resp *datastore.ListAttestedNodeEventsResponse, err error) {
-	if err = ds.withReadTx(ctx, func(tx *gorm.DB) (err error) {
-		resp, err = listAttestedNodeEvents(tx, req)
-		return err
-	}); err != nil {
-		return nil, err
+	if req.DataConsistency == datastore.TolerateStale && ds.roDb != nil {
+		return listAttestedNodeEvents(ds.roDb, req)
 	}
-	return resp, nil
+	return listAttestedNodeEvents(ds.db, req)
 }
 
 // PruneAttestedNodeEvents deletes all attested node events older than a specified duration (i.e. more than 24 hours old)
@@ -571,13 +569,10 @@ func (ds *Plugin) PruneRegistrationEntries(ctx context.Context, expiresBefore ti
 
 // ListRegistrationEntryEvents lists all registration entry events
 func (ds *Plugin) ListRegistrationEntryEvents(ctx context.Context, req *datastore.ListRegistrationEntryEventsRequest) (resp *datastore.ListRegistrationEntryEventsResponse, err error) {
-	if err = ds.withReadTx(ctx, func(tx *gorm.DB) (err error) {
-		resp, err = listRegistrationEntryEvents(tx, req)
-		return err
-	}); err != nil {
-		return nil, err
+	if req.DataConsistency == datastore.TolerateStale && ds.roDb != nil {
+		return listRegistrationEntryEvents(ds.roDb, req)
 	}
-	return resp, nil
+	return listRegistrationEntryEvents(ds.db, req)
 }
 
 // PruneRegistrationEntryEvents deletes all registration entry events older than a specified duration (i.e. more than 24 hours old)
@@ -1303,7 +1298,7 @@ func countBundles(tx *gorm.DB) (int32, error) {
 		return 0, newWrappedSQLError(err)
 	}
 
-	return int32(count), nil
+	return util.CheckedCast[int32](count)
 }
 
 // listBundles can be used to fetch all existing bundles.
@@ -1339,7 +1334,6 @@ func listBundles(tx *gorm.DB, req *datastore.ListBundlesRequest) (*datastore.Lis
 		Pagination: p,
 	}
 	for _, model := range bundles {
-		model := model // alias the loop variable since we pass it by reference below
 		bundle, err := modelToBundle(&model)
 		if err != nil {
 			return nil, err
@@ -1589,7 +1583,7 @@ func countAttestedNodes(tx *gorm.DB) (int32, error) {
 		return 0, newWrappedSQLError(err)
 	}
 
-	return int32(count), nil
+	return util.CheckedCast[int32](count)
 }
 
 func countAttestedNodesHasFilters(req *datastore.CountAttestedNodesRequest) bool {
@@ -1688,7 +1682,7 @@ func countAttestedNodesWithFilters(ctx context.Context, db *sqlDB, _ logrus.Fiel
 			}
 		}
 
-		val += int32(len(resp.Nodes))
+		val += util.MustCast[int32](len(resp.Nodes))
 
 		listReq.Pagination = resp.Pagination
 	}
@@ -1707,7 +1701,7 @@ func createAttestedNodeEvent(tx *gorm.DB, event *datastore.AttestedNodeEvent) er
 	return nil
 }
 
-func listAttestedNodeEvents(tx *gorm.DB, req *datastore.ListAttestedNodeEventsRequest) (*datastore.ListAttestedNodeEventsResponse, error) {
+func listAttestedNodeEvents(db *sqlDB, req *datastore.ListAttestedNodeEventsRequest) (*datastore.ListAttestedNodeEventsResponse, error) {
 	var events []AttestedNodeEvent
 
 	if req.GreaterThanEventID != 0 || req.LessThanEventID != 0 {
@@ -1716,11 +1710,11 @@ func listAttestedNodeEvents(tx *gorm.DB, req *datastore.ListAttestedNodeEventsRe
 			return nil, newWrappedSQLError(err)
 		}
 
-		if err := tx.Find(&events, query.String(), id).Order("id asc").Error; err != nil {
+		if err := db.Find(&events, query.String(), id).Order("id asc").Error; err != nil {
 			return nil, newWrappedSQLError(err)
 		}
 	} else {
-		if err := tx.Find(&events).Order("id asc").Error; err != nil {
+		if err := db.Find(&events).Order("id asc").Error; err != nil {
 			return nil, newWrappedSQLError(err)
 		}
 	}
@@ -3327,7 +3321,7 @@ func countRegistrationEntries(ctx context.Context, db *sqlDB, _ logrus.FieldLogg
 			}
 		}
 
-		val += int32(len(resp.Entries))
+		val += util.MustCast[int32](len(resp.Entries))
 
 		listReq.Pagination = resp.Pagination
 	}
@@ -3852,10 +3846,16 @@ func fillEntryFromRow(entry *common.RegistrationEntry, r *entryRow) error {
 		entry.FederatesWith = append(entry.FederatesWith, r.TrustDomain.String)
 	}
 	if r.RegTTL.Valid {
-		entry.X509SvidTtl = int32(r.RegTTL.Int64)
+		var err error
+		if entry.X509SvidTtl, err = util.CheckedCast[int32](r.RegTTL.Int64); err != nil {
+			return newSQLError("invalid value for X.509 SVID TTL: %s", err)
+		}
 	}
 	if r.RegJwtSvidTTL.Valid {
-		entry.JwtSvidTtl = int32(r.RegJwtSvidTTL.Int64)
+		var err error
+		if entry.JwtSvidTtl, err = util.CheckedCast[int32](r.RegJwtSvidTTL.Int64); err != nil {
+			return newSQLError("invalid value for JWT SVID TTL: %s", err)
+		}
 	}
 	if r.Hint.Valid {
 		entry.Hint = r.Hint.String
@@ -4092,7 +4092,7 @@ func deleteRegistrationEntryEvent(tx *gorm.DB, eventID uint) error {
 	return nil
 }
 
-func listRegistrationEntryEvents(tx *gorm.DB, req *datastore.ListRegistrationEntryEventsRequest) (*datastore.ListRegistrationEntryEventsResponse, error) {
+func listRegistrationEntryEvents(db *sqlDB, req *datastore.ListRegistrationEntryEventsRequest) (*datastore.ListRegistrationEntryEventsResponse, error) {
 	var events []RegisteredEntryEvent
 
 	if req.GreaterThanEventID != 0 || req.LessThanEventID != 0 {
@@ -4101,11 +4101,11 @@ func listRegistrationEntryEvents(tx *gorm.DB, req *datastore.ListRegistrationEnt
 			return nil, newWrappedSQLError(err)
 		}
 
-		if err := tx.Find(&events, query.String(), id).Order("id asc").Error; err != nil {
+		if err := db.Find(&events, query.String(), id).Order("id asc").Error; err != nil {
 			return nil, newWrappedSQLError(err)
 		}
 	} else {
-		if err := tx.Find(&events).Order("id asc").Error; err != nil {
+		if err := db.Find(&events).Order("id asc").Error; err != nil {
 			return nil, newWrappedSQLError(err)
 		}
 	}
@@ -4279,7 +4279,6 @@ func listFederationRelationships(tx *gorm.DB, req *datastore.ListFederationRelat
 		FederationRelationships: []*datastore.FederationRelationship{},
 	}
 	for _, model := range federationRelationships {
-		model := model // alias the loop variable since we pass it by reference below
 		federationRelationship, err := modelToFederationRelationship(tx, &model)
 		if err != nil {
 			return nil, err
@@ -4784,7 +4783,6 @@ func listCAJournalsForTesting(tx *gorm.DB) (caJournals []*datastore.CAJournal, e
 	}
 
 	for _, model := range caJournalsModel {
-		model := model // alias the loop variable since we pass it by reference below
 		caJournals = append(caJournals, modelToCAJournal(model))
 	}
 	return caJournals, nil

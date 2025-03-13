@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sync"
 	"testing"
 
@@ -85,7 +86,6 @@ func TestConfigure(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			idp := fakeidentityprovider.New()
 
@@ -204,7 +204,6 @@ func testUpdateBundleObject(t *testing.T, notify func(notifier.Notifier) error) 
 			desc: "notifier(gcs_bundle): unable to update bundle object the-bucket/bundle.pem: googleapi: got HTTP response code 412 with body: ohno",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a raw instance so we can hook the bucket client creation,
 			// possibly overriding with a test specific hook.
@@ -294,7 +293,7 @@ func (c *fakeBucketClient) PutObject(_ context.Context, bucket, object string, d
 		return err
 	}
 
-	c.data = append([]byte(nil), data...)
+	c.data = slices.Clone(data)
 	return nil
 }
 
@@ -312,7 +311,7 @@ func (c *fakeBucketClient) AppendPutObjectError(err error) {
 
 func (c *fakeBucketClient) GetBundleData() []byte {
 	c.mu.Lock()
-	data := append([]byte(nil), c.data...)
+	data := slices.Clone(c.data)
 	c.mu.Unlock()
 	return data
 }

@@ -347,6 +347,10 @@ func (s *SlotLoader) loadX509CASlotFromEntry(ctx context.Context, entry *journal
 		return nil, "no slot id", nil
 	}
 
+	if entry.GetNotAfter() < time.Now().Unix() {
+		return nil, "slot expired", nil
+	}
+
 	cert, err := x509.ParseCertificate(entry.Certificate)
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to parse CA certificate: %w", err)
@@ -415,6 +419,10 @@ func (s *SlotLoader) tryLoadJWTKeySlotFromEntry(ctx context.Context, entry *jour
 func (s *SlotLoader) loadJWTKeySlotFromEntry(ctx context.Context, entry *journal.JWTKeyEntry) (*jwtKeySlot, string, error) {
 	if entry.SlotId == "" {
 		return nil, "no slot id", nil
+	}
+
+	if entry.GetNotAfter() < time.Now().Unix() {
+		return nil, "slot expired", nil
 	}
 
 	publicKey, err := x509.ParsePKIXPublicKey(entry.PublicKey)
@@ -510,19 +518,13 @@ func otherSlotID(id string) string {
 
 func preparationThreshold(issuedAt, notAfter time.Time) time.Time {
 	lifetime := notAfter.Sub(issuedAt)
-	threshold := lifetime / preparationThresholdDivisor
-	if threshold > preparationThresholdCap {
-		threshold = preparationThresholdCap
-	}
+	threshold := min(lifetime/preparationThresholdDivisor, preparationThresholdCap)
 	return notAfter.Add(-threshold)
 }
 
 func keyActivationThreshold(issuedAt, notAfter time.Time) time.Time {
 	lifetime := notAfter.Sub(issuedAt)
-	threshold := lifetime / activationThresholdDivisor
-	if threshold > activationThresholdCap {
-		threshold = activationThresholdCap
-	}
+	threshold := min(lifetime/activationThresholdDivisor, activationThresholdCap)
 	return notAfter.Add(-threshold)
 }
 

@@ -528,7 +528,6 @@ func TestServiceMintX509SVID(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 
@@ -788,7 +787,6 @@ func TestServiceMintJWTSVID(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 
@@ -1089,7 +1087,6 @@ func TestServiceNewJWTSVID(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 
@@ -1717,7 +1714,6 @@ func TestServiceBatchNewX509SVID(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 
@@ -2002,7 +1998,6 @@ func TestNewDownstreamX509CA(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 			test.ef.err = tt.fetcherErr
@@ -2176,6 +2171,20 @@ func verifyJWTSVIDResponse(t *testing.T, svid *types.JWTSVID, id spiffeid.ID, au
 type entryFetcher struct {
 	err     string
 	entries []*types.Entry
+}
+
+func (f *entryFetcher) LookupAuthorizedEntries(ctx context.Context, agentID spiffeid.ID, _ map[string]struct{}) (map[string]*types.Entry, error) {
+	entries, err := f.FetchAuthorizedEntries(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	entriesMap := make(map[string]*types.Entry)
+	for _, entry := range entries {
+		entriesMap[entry.GetId()] = entry
+	}
+
+	return entriesMap, nil
 }
 
 func (f *entryFetcher) FetchAuthorizedEntries(ctx context.Context, agentID spiffeid.ID) ([]*types.Entry, error) {

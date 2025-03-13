@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -693,7 +694,6 @@ func TestConfigure(t *testing.T) {
 			`,
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupTest(t, withNoConfigure())
 			_, err := test.rawPlugin.Configure(context.Background(), &configv1.ConfigureRequest{
@@ -790,9 +790,7 @@ func (c *fakeKubeClient) Patch(_ context.Context, namespace, configMap string, p
 	if entry.Data == nil {
 		entry.Data = map[string]string{}
 	}
-	for key, data := range patchedMap.Data {
-		entry.Data[key] = data
-	}
+	maps.Copy(entry.Data, patchedMap.Data)
 	return nil
 }
 

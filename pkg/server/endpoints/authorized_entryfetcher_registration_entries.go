@@ -40,9 +40,6 @@ type registrationEntries struct {
 }
 
 func (a *registrationEntries) captureChangedEntries(ctx context.Context) error {
-	// first, reset the entries we might fetch.
-	a.fetchEntries = make(map[string]struct{})
-
 	if err := a.searchBeforeFirstEvent(ctx); err != nil {
 		return err
 	}
@@ -104,16 +101,10 @@ func (a *registrationEntries) selectPolledEvents(ctx context.Context) {
 }
 
 func (a *registrationEntries) scanForNewEvents(ctx context.Context) error {
-	// If we haven't seen an event, scan for all events; otherwise, scan from the last event.
-	var resp *datastore.ListRegistrationEntryEventsResponse
-	var err error
-	if a.firstEventTime.IsZero() {
-		resp, err = a.ds.ListRegistrationEntryEvents(ctx, &datastore.ListRegistrationEntryEventsRequest{})
-	} else {
-		resp, err = a.ds.ListRegistrationEntryEvents(ctx, &datastore.ListRegistrationEntryEventsRequest{
-			GreaterThanEventID: a.lastEvent,
-		})
-	}
+	resp, err := a.ds.ListRegistrationEntryEvents(ctx, &datastore.ListRegistrationEntryEventsRequest{
+		DataConsistency:    datastore.TolerateStale,
+		GreaterThanEventID: a.lastEvent,
+	})
 	if err != nil {
 		return err
 	}
@@ -198,12 +189,15 @@ func buildRegistrationEntriesCache(ctx context.Context, log logrus.FieldLogger, 
 		},
 	}
 
+	if err := registrationEntries.captureChangedEntries(ctx); err != nil {
+		return nil, err
+	}
+
 	if err := registrationEntries.loadCache(ctx, pageSize); err != nil {
 		return nil, err
 	}
-	if err := registrationEntries.updateCache(ctx); err != nil {
-		return nil, err
-	}
+
+	registrationEntries.emitMetrics()
 
 	return registrationEntries, nil
 }
@@ -227,7 +221,7 @@ func (a *registrationEntries) updateCachedEntries(ctx context.Context) error {
 	for entryId := range a.fetchEntries {
 		commonEntry, err := a.ds.FetchRegistrationEntry(ctx, entryId)
 		if err != nil {
-			return err
+			continue
 		}
 
 		if commonEntry == nil {
@@ -251,8 +245,8 @@ func (a *registrationEntries) updateCachedEntries(ctx context.Context) error {
 }
 
 func (a *registrationEntries) emitMetrics() {
-	if a.skippedEntryEvents != int(a.eventTracker.EventCount()) {
-		a.skippedEntryEvents = int(a.eventTracker.EventCount())
+	if a.skippedEntryEvents != a.eventTracker.EventCount() {
+		a.skippedEntryEvents = a.eventTracker.EventCount()
 		server_telemetry.SetSkippedEntryEventIDsCacheCountGauge(a.metrics, a.skippedEntryEvents)
 	}
 

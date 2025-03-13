@@ -141,7 +141,6 @@ func TestCountEntries(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ds := fakedatastore.New(t)
 			test := setupServiceTest(t, ds)
@@ -1194,7 +1193,6 @@ func TestListEntries(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 			ds.SetNextError(tt.dsError)
@@ -1444,7 +1442,6 @@ func TestGetEntry(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 			ds.SetNextError(tt.dsError)
@@ -2393,7 +2390,6 @@ func TestBatchCreateEntry(t *testing.T) {
 			}},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ds := newFakeDS(t)
 
@@ -2654,7 +2650,6 @@ func TestBatchDeleteEntry(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ds := fakedatastore.New(t)
 			test := setupServiceTest(t, ds)
@@ -2871,7 +2866,6 @@ func TestGetAuthorizedEntries(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t, fakedatastore.New(t))
 			defer test.Cleanup()
@@ -3145,6 +3139,7 @@ func TestSyncAuthorizedEntries(t *testing.T) {
 								ParentId:       entry1.ParentId,
 								Selectors:      entry1.Selectors,
 								RevisionNumber: entry1.RevisionNumber,
+								CreatedAt:      entry1.CreatedAt,
 							},
 							{
 								Id:             entry2.Id,
@@ -3268,7 +3263,6 @@ func TestSyncAuthorizedEntries(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t, fakedatastore.New(t))
 			defer func() {
@@ -4612,7 +4606,6 @@ func TestBatchUpdateEntry(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ds := fakedatastore.New(t)
 			test := setupServiceTest(t, ds)
@@ -4846,6 +4839,20 @@ func (f *fakeDS) CreateOrReturnRegistrationEntry(ctx context.Context, entry *com
 type entryFetcher struct {
 	err     string
 	entries []*types.Entry
+}
+
+func (f *entryFetcher) LookupAuthorizedEntries(ctx context.Context, agentID spiffeid.ID, _ map[string]struct{}) (map[string]*types.Entry, error) {
+	entries, err := f.FetchAuthorizedEntries(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	entriesMap := make(map[string]*types.Entry)
+	for _, entry := range entries {
+		entriesMap[entry.GetId()] = entry
+	}
+
+	return entriesMap, nil
 }
 
 func (f *entryFetcher) FetchAuthorizedEntries(ctx context.Context, agentID spiffeid.ID) ([]*types.Entry, error) {

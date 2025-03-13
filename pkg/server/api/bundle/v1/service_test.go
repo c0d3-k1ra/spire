@@ -259,7 +259,6 @@ func TestGetFederatedBundle(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 			test.isAdmin = tt.isAdmin
@@ -361,7 +360,6 @@ func TestGetBundle(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t)
 			defer test.Cleanup()
@@ -747,7 +745,6 @@ func TestAppendBundle(t *testing.T) {
 			noBundle: true,
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t)
 			defer test.Cleanup()
@@ -1107,7 +1104,6 @@ func TestBatchDeleteFederatedBundle(t *testing.T) {
 			dsError:         status.New(codes.Internal, "datasource fails").Err(),
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t)
 			defer test.Cleanup()
@@ -1377,7 +1373,6 @@ func TestPublishJWTAuthority(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 
@@ -1540,7 +1535,6 @@ func TestListFederatedBundles(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 
@@ -1694,7 +1688,6 @@ func TestCountBundles(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t)
 			defer test.Cleanup()
@@ -1726,12 +1719,12 @@ func createBundle(t *testing.T, test *serviceTest, td string) *common.Bundle {
 		TrustDomainId:  td,
 		RefreshHint:    60,
 		SequenceNumber: 42,
-		RootCas:        []*common.Certificate{{DerBytes: []byte(fmt.Sprintf("cert-bytes-%s", td))}},
+		RootCas:        []*common.Certificate{{DerBytes: fmt.Appendf(nil, "cert-bytes-%s", td)}},
 		JwtSigningKeys: []*common.PublicKey{
 			{
 				Kid:       fmt.Sprintf("key-id-%s", td),
 				NotAfter:  time.Now().Add(time.Minute).Unix(),
-				PkixBytes: []byte(fmt.Sprintf("key-bytes-%s", td)),
+				PkixBytes: fmt.Appendf(nil, "key-bytes-%s", td),
 			},
 		},
 	}
@@ -2091,7 +2084,6 @@ func TestBatchCreateFederatedBundle(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test.logHook.Reset()
 			clearDSBundles(t, test.ds)
@@ -2507,7 +2499,6 @@ func TestBatchUpdateFederatedBundle(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t)
 			defer test.Cleanup()
@@ -2897,7 +2888,6 @@ func TestBatchSetFederatedBundle(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			test := setupServiceTest(t)
 			defer test.Cleanup()

@@ -41,9 +41,6 @@ type attestedNodes struct {
 }
 
 func (a *attestedNodes) captureChangedNodes(ctx context.Context) error {
-	// first, reset what we might fetch
-	a.fetchNodes = make(map[string]struct{})
-
 	if err := a.searchBeforeFirstEvent(ctx); err != nil {
 		return err
 	}
@@ -105,16 +102,10 @@ func (a *attestedNodes) selectPolledEvents(ctx context.Context) {
 }
 
 func (a *attestedNodes) scanForNewEvents(ctx context.Context) error {
-	// If we haven't seen an event, scan for all events; otherwise, scan from the last event.
-	var resp *datastore.ListAttestedNodeEventsResponse
-	var err error
-	if a.firstEventTime.IsZero() {
-		resp, err = a.ds.ListAttestedNodeEvents(ctx, &datastore.ListAttestedNodeEventsRequest{})
-	} else {
-		resp, err = a.ds.ListAttestedNodeEvents(ctx, &datastore.ListAttestedNodeEventsRequest{
-			GreaterThanEventID: a.lastEvent,
-		})
-	}
+	resp, err := a.ds.ListAttestedNodeEvents(ctx, &datastore.ListAttestedNodeEventsRequest{
+		DataConsistency:    datastore.TolerateStale,
+		GreaterThanEventID: a.lastEvent,
+	})
 	if err != nil {
 		return err
 	}
@@ -187,12 +178,15 @@ func buildAttestedNodesCache(ctx context.Context, log logrus.FieldLogger, metric
 		},
 	}
 
+	if err := attestedNodes.captureChangedNodes(ctx); err != nil {
+		return nil, err
+	}
+
 	if err := attestedNodes.loadCache(ctx); err != nil {
 		return nil, err
 	}
-	if err := attestedNodes.updateCache(ctx); err != nil {
-		return nil, err
-	}
+
+	attestedNodes.emitMetrics()
 
 	return attestedNodes, nil
 }
@@ -215,7 +209,7 @@ func (a *attestedNodes) updateCachedNodes(ctx context.Context) error {
 	for spiffeId := range a.fetchNodes {
 		node, err := a.ds.FetchAttestedNode(ctx, spiffeId)
 		if err != nil {
-			return err
+			continue
 		}
 
 		// Node was deleted
@@ -227,7 +221,7 @@ func (a *attestedNodes) updateCachedNodes(ctx context.Context) error {
 
 		selectors, err := a.ds.GetNodeSelectors(ctx, spiffeId, datastore.RequireCurrent)
 		if err != nil {
-			return err
+			continue
 		}
 		node.Selectors = selectors
 
@@ -239,8 +233,8 @@ func (a *attestedNodes) updateCachedNodes(ctx context.Context) error {
 }
 
 func (a *attestedNodes) emitMetrics() {
-	if a.skippedNodeEvents != int(a.eventTracker.EventCount()) {
-		a.skippedNodeEvents = int(a.eventTracker.EventCount())
+	if a.skippedNodeEvents != a.eventTracker.EventCount() {
+		a.skippedNodeEvents = a.eventTracker.EventCount()
 		server_telemetry.SetSkippedNodeEventIDsCacheCountGauge(a.metrics, a.skippedNodeEvents)
 	}
 

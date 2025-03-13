@@ -48,6 +48,11 @@ func main() {
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		NotAfter:     neverExpires,
 		Subject:      pkix.Name{CommonName: "COMMONNAME"},
+		URIs: []*url.URL{
+			{Scheme: "x509pop", Host: "example.org", Path: "/datacenter/us-east-1"},
+			{Scheme: "x509pop", Host: "example.org", Path: "/environment/production"},
+			{Scheme: "x509pop", Host: "example.org", Path: "/key/path/to/value"},
+		},
 	}, intermediateKey, intermediateCert)
 
 	svid, _ := url.Parse("spiffe://example.org/somesvid")
@@ -65,7 +70,12 @@ func main() {
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		NotAfter:     neverExpires,
 		Subject:      pkix.Name{CommonName: "COMMONNAME"},
-		URIs:         []*url.URL{svidExchange},
+		URIs: []*url.URL{
+			svidExchange,
+			{Scheme: "x509pop", Host: "example.org", Path: "/datacenter/us-east-1"},
+			{Scheme: "x509pop", Host: "example.org", Path: "/environment/production"},
+			{Scheme: "x509pop", Host: "example.org", Path: "/key/path/to/value"},
+		},
 	}, intermediateKey, intermediateCert)
 
 	writeKey("leaf-key.pem", leafKey)
@@ -90,7 +100,7 @@ func createCertificate(key *rsa.PrivateKey, tmpl *x509.Certificate, parentKey *r
 }
 
 func generateRSAKey() *rsa.PrivateKey {
-	key, err := rsa.GenerateKey(rand.Reader, 768) //nolint: gosec // small key is to keep test fast... not a security feature
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	panice(err)
 	return key
 }

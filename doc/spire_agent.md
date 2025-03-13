@@ -21,7 +21,6 @@ This document is a configuration reference for SPIRE Agent. It includes informat
 | NodeAttestor     | [azure_msi](/doc/plugin_agent_nodeattestor_azure_msi.md)                | A node attestor which attests agent identity using an Azure MSI token                                                                            |
 | NodeAttestor     | [gcp_iit](/doc/plugin_agent_nodeattestor_gcp_iit.md)                    | A node attestor which attests agent identity using a GCP Instance Identity Token                                                                 |
 | NodeAttestor     | [join_token](/doc/plugin_agent_nodeattestor_jointoken.md)               | A node attestor which uses a server-generated join token                                                                                         |
-| NodeAttestor     | [k8s_sat](/doc/plugin_agent_nodeattestor_k8s_sat.md) (deprecated)       | A node attestor which attests agent identity using a Kubernetes Service Account token                                                            |
 | NodeAttestor     | [k8s_psat](/doc/plugin_agent_nodeattestor_k8s_psat.md)                  | A node attestor which attests agent identity using a Kubernetes Projected Service Account token                                                  |
 | NodeAttestor     | [sshpop](/doc/plugin_agent_nodeattestor_sshpop.md)                      | A node attestor which attests agent identity using an existing ssh certificate                                                                   |
 | NodeAttestor     | [x509pop](/doc/plugin_agent_nodeattestor_x509pop.md)                    | A node attestor which attests agent identity using an existing X.509 certificate                                                                 |
@@ -77,7 +76,7 @@ This may be useful for templating configuration files, for example across differ
 |:------------------------------|--------------------------------------------------------------------------------------|-------------------------|
 | `named_pipe_name`             | Pipe name to bind the SPIRE Agent API named pipe (Windows only)                      | \spire-agent\public\api |
 | `sync_interval`               | Sync interval with SPIRE server with exponential backoff                             | 5 sec                   |
-| `use_sync_authorized_entries` | Use SyncAuthorizedEntries API for periodically synchronization of authorized entries | false                   |
+| `use_sync_authorized_entries` | Use SyncAuthorizedEntries API for periodically synchronization of authorized entries | true                    |
 | `require_pq_kem`              | Require use of a post-quantum-safe key exchange method for TLS handshakes            | false                   |
 
 ### Initial trust bundle configuration

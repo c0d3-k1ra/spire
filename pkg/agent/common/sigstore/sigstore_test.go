@@ -381,7 +381,6 @@ func TestVerify(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -711,7 +710,7 @@ func createTestCert() *x509.Certificate {
 
 func createFakePayload() []byte {
 	signaturePayload := payload.SimpleContainerImage{
-		Optional: map[string]interface{}{
+		Optional: map[string]any{
 			"subject": "test-subject",
 		},
 	}
